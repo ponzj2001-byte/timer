@@ -9,7 +9,8 @@ const COL={blue:'#00838f',orange:'#e65100',red:'#c62828'};   // 다이얼 색: �
 const KEY='phoneTimerV1';
 const DEF={theme:'light',scale:1,volume:.8,muted:false,sound:'chime',repeat:2,tick:true,vibrate:true,
   presets:[1,3,5,10,15,20],timerSec:300,run:null,
-  events:[],fired:{},evSound:'system',pin:''};
+  events:[],fired:{},evSound:'system',pin:'',
+  showCs:true,show5:true,csAlarm:0,p5Alarm:-1};
 let S;
 try{S=Object.assign({},DEF,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){S=Object.assign({},DEF)}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -79,15 +80,28 @@ try{
 setTimeout(()=>{if(lastClock<0)useFallback()},1500);
 
 // ---------- 한국 표준시 날짜·시각 + 음력 ----------
+// 한국 음력 (한국천문연구원 기준 음력표 1990~2050). 중국 음력과 하루씩 다른 달이 있어 직접 계산
+const KLUN={start:'1990-01-27',data:"1R34UE6WX9Z[\\1R34U67X9Z[\\1RS45V78Y:[\\1RSCT5V78Y:[<QRS4U6W89Z;\\1RS4UV7XHY:;\\1R3TU6W8YZ;\\12S4U6WX9Z[<Q23T5EVW8YZ[<Q23T56W8YZ[<QR34U67X9Z[<QRS4DU67X9Z;\\QR3T5V78Y:[<QR3TU6W89Z;\\1RBST5V7X9Z;\\1R3T5VW8YZ;<Q2S4U6WGXY:[\\12S45V7XYZ;\\Q23T56W8YZ;\\QR34UE6W8Y:[\\Q2S4U67X9Z;\\Q2ST5V78Y:[<Q2ScT5V78Y:[<Q2ST5V7X9Z;\\1R3T5V7XYIZ;\\1R34U6WXY:[<Q2S45V7XY:[\\1R3T5EV7X9Z[\\1R3T56W8Y:[\\Q2S4U67X9Z;\\Q2STDU67X9Z;\\1RS4U6W8Y:[<Q2S4UV7X9Z;\\1RBS4U6WX9Z;\\1R34U6WX9Z[<Q2S45VFW8YZ[<Q2S45V7X9Z[\\1R3T56W89Z[\\1RS4UE6W89Z[<QR3TU67X9:[\\1R3TU6W8Y:[<Q2SCT5VW8Y:[<Q23T5VW8YZ;\\1R34U6W8YZ[K\\1R34U6W8YZ[<Q2S45V78YZ;\\QR3T56f78YZ;\\QR3T56W89Z;\\QR3T5V7X9:[<QR3TUEV7X9Z;<Q2ST5VW8Y:[<Q23T5VW8YZ;\\1RB3T5V7XY:[\\1R34U67XY:[\\Q2S45V7GX9Z[\\Q2S45V78Y:[\\Q2ST56W89Z;\\Q2ST5e6W89Z;\\1RS4UV7X9Z;<Q2S4UV7XY:[<Q23c4U6WX9Z"};
+const KL=(function(){
+  const [y0,m0,d0]=KLUN.start.split('-').map(Number),base=Date.UTC(y0,m0-1,d0)/864e5,starts=[],info=[];let t=base;
+  for(const ch of KLUN.data){const c=ch.charCodeAt(0)-48,len=c&32?30:29;starts.push(t);info.push({m:c&15,leap:!!(c&16),len});t+=len}
+  return function(y,m,d){
+    const x=Date.UTC(y,m-1,d)/864e5;if(x<base||x>=t)return null;
+    let lo=0,hi=starts.length-1;while(lo<hi){const mid=(lo+hi+1)>>1;if(starts[mid]<=x)lo=mid;else hi=mid-1}
+    const i=info[lo];return {m:i.m,leap:i.leap,d:x-starts[lo]+1,len:i.len};
+  };
+})();
 const fParts=new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'numeric',day:'numeric',weekday:'long',hour:'numeric',minute:'numeric',second:'numeric',hourCycle:'h23'});
 const fLunar=new Intl.DateTimeFormat('ko-KR-u-ca-chinese',{timeZone:'Asia/Seoul',year:'numeric',month:'numeric',day:'numeric'});
 let lunarKey='',lunarText='(음력 --월 --일)';
 function lunarOf(t,solarKey){
   if(solarKey===lunarKey)return lunarText;
   try{
-    const p=Object.fromEntries(fLunar.formatToParts(t).map(x=>[x.type,x.value]));
-    const leap=/^윤/.test(p.month||''),mo=String(p.month||'').replace('윤','');
-    lunarText=`(음력 ${leap?'윤':''}${mo}월 ${p.day}일)`;
+    const [y,m,d]=solarKey.split('-').map(Number),k=KL(y,m,d);
+    if(k)lunarText=`(음력 ${k.leap?'윤':''}${k.m}월 ${k.d}일)`;
+    else{const p=Object.fromEntries(fLunar.formatToParts(t).map(x=>[x.type,x.value]));
+      const leap=/^윤/.test(p.month||''),mo=String(p.month||'').replace('윤','');
+      lunarText=`(음력 ${leap?'윤':''}${mo}월 ${p.day}일)`}
   }catch(e){lunarText=''}
   lunarKey=solarKey;return lunarText;
 }
@@ -340,6 +354,12 @@ function openSettings(){
     <option value="app">항상 앱에서 소리</option>
     <option value="none">소리 없이 화면만</option></select></div>
   <div class="srow"><label>알림 권한</label><span id="permState"></span><button class="sbtn" data-act="notifperm">알림 허용</button></div>
+  <h3 class="c5">🙏 수도 일정 (치성 · 5일)</h3>
+  <div class="srow"><label>치성</label><label style="min-width:0;font-weight:normal"><input id="sShowCs" type="checkbox"> 달력에 표시</label>
+    <select id="sCsAlarm"><option value="-1">알림 없음</option><option value="0">당일 아침 8시 알림</option><option value="1440">하루 전 아침 8시 알림</option></select></div>
+  <div class="srow"><label>5일</label><label style="min-width:0;font-weight:normal"><input id="sShow5" type="checkbox"> 달력에 표시</label>
+    <select id="sP5Alarm"><option value="-1">알림 없음</option><option value="0">당일 아침 8시 알림</option><option value="1440">하루 전 아침 8시 알림</option></select></div>
+  <div class="memo">치성 15가지는 음력 날짜로 앱에 저장되어 해마다 자동으로 들어갑니다. 5일은 갑(甲)·기(己)일로 5일마다 계산합니다.</div>
   <div class="srow"><label>일정 잠금</label><input id="sPin" type="password" inputmode="numeric" maxlength="8" placeholder="숫자 4~8자리 (비우면 끔)" style="width:12em"><button class="sbtn purple" data-act="setpin">저장</button></div>
   <div class="srow"><label>백업</label><button class="sbtn green" data-act="exportev">일정 내보내기</button><button class="sbtn gray" data-act="importev">가져오기</button><input id="impFile" type="file" accept=".json,application/json" hidden></div>
   ${installCard}
@@ -348,7 +368,7 @@ function openSettings(){
   <div class="memo">입력한 시간·설정은 이 폰의 브라우저에만 저장되고 어디로도 전송되지 않습니다.</div>
   <button class="sbtn red block" data-act="resetall">모든 설정 처음으로</button>`);
   $('#sSound').value=S.sound;$('#sVol').value=S.volume;$('#sRep').value=S.repeat;$('#sTick').checked=S.tick;$('#sVib').checked=S.vibrate;
-  $('#sEvSound').value=S.evSound;if(window.__evPerm)window.__evPerm();
+  $('#sEvSound').value=S.evSound;$('#sShowCs').checked=S.showCs!==false;$('#sShow5').checked=S.show5!==false;$('#sCsAlarm').value=String(S.csAlarm);$('#sP5Alarm').value=String(S.p5Alarm);if(window.__evPerm)window.__evPerm();
   $('#sTheme').value=S.theme;$('#sScale').value=String(S.scale);$('#sPresets').value=S.presets.join(', ');
 }
 function openHow(){
@@ -380,6 +400,8 @@ $('#sheetBg').addEventListener('input',e=>{
   else if(t.id==='sTheme'){S.theme=t.value;applyTheme()}
   else if(t.id==='sScale'){S.scale=+t.value;applyTheme()}
   else if(t.id==='sEvSound'){S.evSound=t.value}
+  else if(t.id==='sShowCs'||t.id==='sShow5'){S[t.id==='sShowCs'?'showCs':'show5']=t.checked;if(window.__evRefresh)window.__evRefresh()}
+  else if(t.id==='sCsAlarm'||t.id==='sP5Alarm'){S[t.id==='sCsAlarm'?'csAlarm':'p5Alarm']=+t.value}
   else if(t.id==='sPresets'){const l=parseList(t.value,1,300);if(l.length){S.presets=l.slice(0,6);renderChips();syncInputs()}}
   else return;
   save();
@@ -389,14 +411,16 @@ $('#sheetBg').addEventListener('input',e=>{
 // ---------- 달력 · 일정 (한국 표준시 기준, 이 폰에만 자동 저장) ----------
 (function(){
 const KST=9*3600e3,DAY=86400e3;
-const CATS=[{k:'class',n:'수업',c:'#1565c0'},{k:'meet',n:'회의',c:'#6a1b9a'},{k:'event',n:'행사',c:'#e65100'},{k:'duty',n:'업무',c:'#00838f'},{k:'exam',n:'시험',c:'#c62828'},{k:'mine',n:'개인',c:'#2e7d32'},{k:'bday',n:'기념일',c:'#ad1457'},{k:'etc',n:'기타',c:'#78909c'}];
+const CATS=[{k:'sudo',n:'수도',c:'#8d1f3a'},{k:'mine',n:'개인',c:'#2e7d32'},{k:'school',n:'학교',c:'#1565c0'},{k:'etc',n:'기타',c:'#78909c'}];
 const CAT=Object.fromEntries(CATS.map(c=>[c.k,c]));
 const catOf=e=>CAT[e.cat]||CAT.etc;
-const REP={none:'',daily:'매일',weekdays:'평일',weekly:'매주',monthly:'매월',yearly:'매년',lunar:'음력 매년'};
+const REP={none:'',daily:'매일',weekdays:'평일',weekly:'매주',monthly:'매월',yearly:'매년',lunar:'음력 매년',p5:'5일마다'};
 const WD=['일','월','화','수','목','금','토'];
 const esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 if(!Array.isArray(S.events))S.events=[];
 if(!S.fired||typeof S.fired!=='object')S.fired={};
+const OLDCAT={class:'school',meet:'school',event:'school',duty:'school',exam:'school',bday:'mine'};
+S.events.forEach(e=>{if(!CAT[e.cat])e.cat=OLDCAT[e.cat]||'etc'});
 
 // 날짜 'YYYY-MM-DD' ↔ 한국 시각
 const ymd=t=>{const d=new Date(t+KST);return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate())};
@@ -415,8 +439,8 @@ const fLun=new Intl.DateTimeFormat('ko-KR-u-ca-chinese',{timeZone:'Asia/Seoul',m
 const lunC={};
 function lunar(ds){
   if(lunC[ds])return lunC[ds];
-  let r={m:0,d:0,leap:false};
-  try{const p=Object.fromEntries(fLun.formatToParts(atKST(ds,'12:00')).map(x=>[x.type,x.value]));r={leap:/^윤/.test(p.month),m:+String(p.month).replace('윤',''),d:+p.day}}catch(e){}
+  const [y,m,d]=ds.split('-').map(Number);let r=KL(y,m,d);
+  if(!r){r={m:0,d:0,leap:false,len:30};try{const p=Object.fromEntries(fLun.formatToParts(atKST(ds,'12:00')).map(x=>[x.type,x.value]));r={leap:/^윤/.test(p.month),m:+String(p.month).replace('윤',''),d:+p.day,len:30}}catch(e){}}
   return lunC[ds]=r;
 }
 const lunText=ds=>{const l=lunar(ds);return l.m?`음력 ${l.leap?'윤':''}${l.m}월 ${l.d}일`:''};
@@ -447,9 +471,28 @@ function occursOn(e,ds){
     default:return ds===e.date;
   }
 }
-const eventsOn=ds=>S.events.filter(e=>occursOn(e,ds)).sort((a,b)=>(a.allday?'':a.time)<(b.allday?'':b.time)?-1:1);
+
+// ---------- 수도 기본 일정: 치성(음력 날짜) + 5일(갑·기일, 5일 간격) ----------
+// 치성 날짜·행사명: 대진성주회 행사·일정(djseongju.org)에서 2025~2028년을 확인해 음력으로 정리
+const CHISEONG=[[1,1,'원단(설날) 신명종합치성'],[1,7,'태백호텔 치성일'],[2,10,'옥황상제님 대순감오득도치성'],[3,1,'대구도장 영대봉안치성'],[3,6,'옥황상제님 화천치성'],[3,11,'중원도장 영대봉안치성'],[4,28,'옥황상제님 봉천명치성'],[6,24,'구천상제님 화천치성'],[7,21,'신기도장 영대봉안치성'],[8,15,'중추절(추석) 신명종합치성'],[9,19,'구천상제님 탄강치성'],[11,15,'부산도장 영대봉안치성'],[11,30,'박성상제님 탄강치성'],[12,4,'옥황상제님 탄강치성'],[12,4,'박성상제님 화천치성']];
+const P5C='#f9a825';
+const jdn=ds=>Math.floor(dsUTC(ds)/DAY)+2440588;
+const isP5=ds=>(jdn(ds)+9)%5===0;      // 천간이 갑(甲)·기(己)인 날 = 5일마다
+function chiseongOn(ds){
+  const l=lunar(ds);if(!l.m||l.leap)return [];
+  return CHISEONG.map((c,i)=>({c,i})).filter(({c})=>c[0]===l.m&&(c[1]===l.d||(c[1]===30&&l.len===29&&l.d===29)));
+}
+function builtinsOn(ds){
+  const out=[];
+  if(S.showCs!==false)chiseongOn(ds).forEach(({c,i})=>out.push({id:'cs'+i,builtin:'cs',title:c[2],allday:true,time:'',cat:'sudo',before:+S.csAlarm,repeat:'lunar',date:ds,memo:'',place:''}));
+  if(S.show5!==false&&isP5(ds))out.push({id:'p5',builtin:'p5',title:'5일',allday:true,time:'',cat:'sudo',before:+S.p5Alarm,repeat:'p5',date:ds,memo:'',place:''});
+  return out;
+}
+function nextBuiltin(test,from,max){let ds=from;for(let i=0;i<(max||400);i++,ds=addDays(ds,1))if(test(ds))return ds;return null}
+window.__evRefresh=()=>{if(screen==='cal')renderCal();updateNext()};
+const eventsOn=ds=>builtinsOn(ds).concat(S.events.filter(e=>occursOn(e,ds)).sort((a,b)=>(a.allday?'':a.time)<(b.allday?'':b.time)?-1:1));
 function nextOcc(e,from){let ds=from<e.date?e.date:from;for(let i=0;i<800;i++,ds=addDays(ds,1)){if(e.until&&ds>e.until)return null;if(occursOn(e,ds))return ds}return null}
-const alarmText=e=>e.before<0?'알림 없음':e.before===0?'정각 알림':e.before===1440?'하루 전 알림':e.before>=60?`${e.before/60}시간 전 알림`:`${e.before}분 전 알림`;
+const alarmText=e=>e.before<0?'알림 없음':e.allday&&e.before===0?'당일 아침 8시 알림':e.allday&&e.before===1440?'하루 전 아침 8시 알림':e.before===0?'정각 알림':e.before===1440?'하루 전 알림':e.before>=60?`${e.before/60}시간 전 알림`:`${e.before}분 전 알림`;
 const meta=e=>[alarmText(e),REP[e.repeat],e.place?'📍'+e.place:''].filter(Boolean).join(' · ');
 function dayLabel(ds){
   const t=todayDS(),[,m,d]=ds.split('-').map(Number);
@@ -475,7 +518,7 @@ function askPin(){
 }
 
 // ---------- 달력 화면 ----------
-let calY,calM,sel,view='month',editId=null,cat='class';
+let calY,calM,sel,view='month',editId=null,cat='school';
 function openCal(){
   if(locked())return askPin();
   if(!sel)sel=todayDS();calY=+sel.slice(0,4);calM=+sel.slice(5,7);
@@ -493,21 +536,22 @@ function renderCal(){
   const lastDay=new Date(Date.UTC(calY,calM,0)).getUTCDate(),weeks=Math.ceil((wdOf(first)+lastDay)/7);
   let h='',ds=start;
   for(let i=0;i<weeks*7;i++,ds=addDays(ds,1)){
-    const l=lunar(ds),hol=holiday(ds),w=i%7,evs=eventsOn(ds);
-    const cls=['cell',+ds.slice(5,7)!==calM?'out':'',w===0?'sun':'',w===6?'sat':'',hol?'hol':'',ds===t?'today':'',ds===sel?'sel':''].filter(Boolean).join(' ');
-    h+=`<button class="${cls}" data-act="selday" data-d="${ds}"><span class="dn">${+ds.slice(8)}</span>`+
-      (hol?`<span class="hn">${hol}</span>`:`<span class="ln">${l.m?(l.leap?'윤':'')+l.m+'.'+l.d:''}</span>`)+
+    const l=lunar(ds),hol=holiday(ds),w=i%7,all=eventsOn(ds),evs=all.filter(e=>!e.builtin);
+    const p5=all.some(e=>e.builtin==='p5'),cs=all.some(e=>e.builtin==='cs');
+    const cls=['cell',+ds.slice(5,7)!==calM?'out':'',w===0?'sun':'',w===6?'sat':'',hol?'hol':'',p5?'p5':'',cs?'cs':'',ds===t?'today':'',ds===sel?'sel':''].filter(Boolean).join(' ');
+    h+=`<button class="${cls}" data-act="selday" data-d="${ds}">${p5?'<span class="p5b">5일</span>':''}<span class="dn">${+ds.slice(8)}</span>`+
+      (cs?`<span class="hn csn">치성</span>`:hol?`<span class="hn">${hol}</span>`:`<span class="ln">${l.m?(l.leap?'윤':'')+l.m+'.'+l.d:''}</span>`)+
       `<span class="dots">${evs.slice(0,4).map(e=>`<i style="background:${catOf(e).c}"></i>`).join('')}</span></button>`;
   }
   $('#calGrid').innerHTML=h;
-  $('#legend').innerHTML=CATS.map(c=>`<i style="background:${c.c}"></i>${c.n}`).join(' ');
+  $('#legend').innerHTML=CATS.map(c=>`<i style="background:${c.c}"></i>${c.n}`).join(' ')+` <i class="lg5"></i>5일 <i class="lgcs"></i>치성`;
   renderDay();renderUp();
 }
 function evRow(e,ds,withDate){
   const c=catOf(e),past=!e.allday&&atKST(ds,e.end||e.time)<now();
-  return `<div class="ev${past?' past':''}" style="--cc:${c.c}"><span class="cb"></span><span class="t">${withDate?`<small>${dayLabel(ds)}</small><br>`:''}${timeText(e)}</span>`+
+  return `<div class="ev${past?' past':''}${e.builtin?' bi-'+e.builtin:''}" style="--cc:${c.c}"><span class="cb"></span><span class="t">${withDate?`<small>${dayLabel(ds)}</small><br>`:''}${timeText(e)}</span>`+
     `<span class="n"><span class="tt">${esc(e.title)}</span><span class="m">${esc(meta(e))}</span>${e.memo?`<span class="mm">📝 ${esc(e.memo.split(/\r?\n/)[0].slice(0,40))}${e.memo.length>40||/\n/.test(e.memo)?' …':''}</span>`:''}</span>`+
-    `<span class="ct">${c.n}</span><button class="e" data-act="editev" data-id="${e.id}" data-d="${ds}" aria-label="열기·고치기">✎</button></div>`;
+    `<span class="ct">${e.builtin==='p5'?'5일':e.builtin==='cs'?'치성':c.n}</span>${e.builtin?'<span class="bi">🙏</span>':`<button class="e" data-act="editev" data-id="${e.id}" data-d="${ds}" aria-label="열기·고치기">✎</button>`}</div>`;
 }
 function renderDay(){
   const [,m,d]=sel.split('-').map(Number),hol=holiday(sel);
@@ -531,7 +575,7 @@ function syncForm(){
   const ta=$('#evMemo');ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight+4,window.innerHeight*.45)+'px';
 }
 function openForm(e,ds){
-  editId=e?e.id:null;cat=e?(e.cat||'etc'):'class';
+  editId=e?e.id:null;cat=e?(e.cat||'etc'):'school';
   $('#formTitle').textContent=e?'✎ 일정 보기 · 고치기':'＋ 새 일정';
   $('#evTitle').value=e?e.title:'';$('#evDate').value=e?e.date:(ds||sel);
   $('#evAllday').checked=e?!!e.allday:false;
@@ -580,7 +624,19 @@ function doFind(){
     const hay=[e.title,e.place,e.memo,catOf(e).n,REP[e.repeat],e.date,`${y}년`,`${m}월`,`${d}일`,`${m}월 ${d}일`,`${y}년 ${m}월`,`${y}.${m}.${d}`,e.time,lunText(e.date)].join(' ').toLowerCase();
     return hay.includes(ql);
   }).sort((a,b)=>(b.date+(b.time||''))<(a.date+(a.time||''))?-1:1);
-  $('#findSum').textContent=`"${q}" 검색 결과 ${hits.length}건`;
+  let bh='';
+  CHISEONG.forEach((c,i)=>{
+    if(S.showCs===false)return;
+    const hay=[c[2],'치성','수도',`음력 ${c[0]}월 ${c[1]}일`,`${c[0]}.${c[1]}`].join(' ').toLowerCase();if(!hay.includes(ql))return;
+    const nx=nextBuiltin(d=>chiseongOn(d).some(x=>x.i===i),t,400);if(!nx)return;const [y,m,d]=nx.split('-').map(Number);
+    bh+=`<button class="fr" style="--cc:#8d1f3a" data-act="findday" data-d="${nx}"><span class="cb"></span><span class="fd"><span class="fw"><span class="fy">${y}년</span> ${m}월 ${d}일 (${WD[wdOf(nx)]}) <span class="fh">종일</span></span><span class="fn">${hl(c[2],q)} <span class="ct">치성</span></span><span class="m">🔁 음력 매년 ${c[0]}월 ${c[1]}일 · ${dayDiff(t,nx)===0?'오늘':'D-'+dayDiff(t,nx)}</span></span></button>`;
+  });
+  if(S.show5!==false&&/5일|오일|수도/.test(q)){
+    let d5=nextBuiltin(isP5,t,6);const list=[];for(let i=0;i<6&&d5;i++){list.push(d5);d5=nextBuiltin(isP5,addDays(d5,1),6)}
+    bh+=list.map(x=>{const [y,m,d]=x.split('-').map(Number);return `<button class="fr" style="--cc:${P5C}" data-act="findday" data-d="${x}"><span class="cb"></span><span class="fd"><span class="fw"><span class="fy">${y}년</span> ${m}월 ${d}일 (${WD[wdOf(x)]}) <span class="fh">종일</span></span><span class="fn">5일 <span class="ct">5일</span></span><span class="m">🔁 5일마다 · ${lunText(x)}</span></span></button>`}).join('');
+  }
+  const bn=(bh.match(/class="fr"/g)||[]).length;
+  $('#findSum').textContent=`"${q}" 검색 결과 ${hits.length+bn}건`;
   $('#findList').innerHTML=hits.map(e=>{
     const c=catOf(e),[y,m,d]=e.date.split('-').map(Number),nx=e.repeat!=='none'?nextOcc(e,t):null;
     const when=`<span class="fy">${y}년</span> ${m}월 ${d}일 (${WD[wdOf(e.date)]}) <span class="fh">${e.allday?'종일':e.time.replace(':','시 ')+'분'+(e.end?' ~ '+e.end.replace(':','시 ')+'분':'')}</span>`;
@@ -588,18 +644,21 @@ function doFind(){
     let snip='';if(memoHit){const i=e.memo.toLowerCase().indexOf(ql),a=Math.max(0,i-20);snip=`<span class="mm">📝 ${a?'…':''}${hl(e.memo.slice(a,i+q.length+30),q)}…</span>`}
     return `<button class="fr" style="--cc:${c.c}" data-act="findgo" data-id="${e.id}" data-d="${nx||e.date}"><span class="cb"></span><span class="fd"><span class="fw">${when}</span><span class="fn">${hl(e.title,q)} <span class="ct">${c.n}</span></span>`+
       `${e.repeat!=='none'?`<span class="m">🔁 ${REP[e.repeat]} 반복 · 다음: ${nx?fullDate(nx):'끝남'}</span>`:''}${e.place?`<span class="m">📍 ${hl(e.place,q)}</span>`:''}${snip}</span></button>`;
-  }).join('')||'<div class="noev">찾은 일정이 없습니다.</div>';
+  }).join('')+bh||'<div class="noev">찾은 일정이 없습니다.</div>';
 }
 document.addEventListener('input',ev=>{if(ev.target.id==='findIn')doFind();else if(ev.target.closest&&ev.target.closest('#formBg'))syncForm()});
 
 // ---------- 첫 화면: 다음 일정 + D-day ----------
 function updateNext(){
-  const card=$('#nextCard'),ups=upcoming(7,2),t=todayDS();
+  const card=$('#nextCard'),ups=upcoming(7,10).filter(u=>!u.e.builtin).slice(0,2),t=todayDS();
   const dd=S.events.filter(e=>e.dday).map(e=>{const ds=nextOcc(e,t);return ds?{e,ds,n:dayDiff(t,ds)}:null}).filter(Boolean).sort((a,b)=>a.n-b.n).slice(0,3);
-  if(!ups.length&&!dd.length){card.hidden=true;return}
+  if(S.showCs!==false){const nc=nextBuiltin(d=>chiseongOn(d).length>0,t,400);if(nc){const n=dayDiff(t,nc);dd.unshift({e:{title:chiseongOn(nc).map(x=>x.c[2]).join(' · '),cat:'sudo'},ds:nc,n,cs:true})}}
+  const n5=S.show5!==false?nextBuiltin(isP5,t,6):null;
+  if(!ups.length&&!dd.length&&!n5){card.hidden=true;return}
   card.hidden=false;
   $('#nextList').innerHTML=ups.map(u=>`<div class="nx"><span class="when">${dayLabel(u.ds)} ${timeText(u.e)}</span><span class="what" style="color:${catOf(u.e).c}">${locked()?'🔒 잠긴 일정':esc(u.e.title)}</span></div>`).join('');
-  $('#ddayList').innerHTML=dd.map(x=>`<div class="nx dd"><span class="dday">${x.n===0?'D-DAY':'D-'+x.n}</span><span class="what" style="color:${catOf(x.e).c}">${locked()?'🔒 잠긴 일정':esc(x.e.title)}</span></div>`).join('');
+  $('#ddayList').innerHTML=dd.map(x=>`<div class="nx dd"><span class="dday${x.cs?' csd':''}">${x.n===0?'D-DAY':'D-'+x.n}</span><span class="what" style="color:${catOf(x.e).c}">${x.cs?'🙏 ':''}${locked()&&!x.cs?'🔒 잠긴 일정':esc(x.e.title)}</span></div>`).join('')+
+    (n5?`<div class="nx"><span class="when p5w">${n5===t?'오늘':dayLabel(n5)}</span><span class="what" style="color:#b26a00">5일${n5===t?'입니다':''}</span></div>`:'');
 }
 
 // ---------- 알림: 화면 + 소리 + 진동 ----------
@@ -639,10 +698,10 @@ function showAlert(){
 }
 function check(t){
   const today=todayDS();
-  for(const e of S.events){
-    if(e.before<0)continue;
-    for(let i=-1;i<=2;i++){
-      const ds=addDays(today,i);if(!occursOn(e,ds))continue;
+  for(let i=-1;i<=2;i++){
+    const ds=addDays(today,i);
+    for(const e of eventsOn(ds)){
+      if(e.before<0)continue;
       const at=atKST(ds,alarmAt(e)),trig=at-e.before*60000,key=e.id+'@'+ds;
       if(S.fired[key]||trig>t)continue;
       S.fired[key]=1;save();
@@ -694,6 +753,7 @@ window.__evAct=async(a,el)=>{
     case 'delform':delForm();break;
     case 'editev':openForm(S.events.find(x=>x.id===el.dataset.id));break;
     case 'findgo':{const d=el.dataset.d;sel=d;calY=+d.slice(0,4);calM=+d.slice(5,7);setView('month');renderCal();openForm(S.events.find(x=>x.id===el.dataset.id));break}
+    case 'findday':{const d=el.dataset.d;sel=d;calY=+d.slice(0,4);calM=+d.slice(5,7);setView('month');renderCal();$('#dayCard').scrollIntoView({behavior:'smooth'});break}
     case 'findclear':$('#findIn').value='';doFind();break;
     case 'evok':showAlert();break;
     case 'notifperm':await askPerm();break;

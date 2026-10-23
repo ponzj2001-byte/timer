@@ -302,3 +302,21 @@ body.evon #evAlert{display:flex}
 .memoCount{text-align:right}
 .lunarNote{font-size:.85rem;font-weight:800;color:var(--purple)}
 .evMemo{max-width:520px;max-height:24dvh;overflow:auto;background:rgba(255,255,255,.14);border-radius:.6em;padding:.6em .9em;font-size:min(4.6vw,2.6dvh);white-space:pre-wrap;text-align:left}
+
+/* 🙏 수도 일정: 5일 = 호박색, 치성 = 진홍 */
+.cell.p5{background:#fff4d6}
+[data-theme=dark] .cell.p5{background:#3a2f12}
+.cell.p5.today{background:#ffe9a8}
+.p5b{position:absolute;top:1px;right:1px;font-size:.52rem;font-weight:800;color:#fff;background:#f9a825;border-radius:.45em;padding:0 .28em;line-height:1.35}
+[data-theme=dark] .p5b{color:#2b2000}
+.cell.cs{box-shadow:inset 0 0 0 2px #8d1f3a}
+.hn.csn{color:#8d1f3a;font-size:.62rem}
+[data-theme=dark] .hn.csn{color:#ff8fa3}
+.legend .lg5{background:#f9a825}.legend .lgcs{background:transparent;border:2px solid #8d1f3a;width:5px;height:5px}
+.ev.bi-p5{background:#fff8e1;border-radius:.5em}
+.ev.bi-cs{background:#fbe9ee;border-radius:.5em}
+[data-theme=dark] .ev.bi-p5{background:#3a2f12}[data-theme=dark] .ev.bi-cs{background:#3a1820}
+.ev.bi-p5 .ct{background:#f9a825}
+.ev .bi{font-size:1rem;padding:0 .2em}
+.nx.dd .dday.csd{background:#8d1f3a}
+.nx .when.p5w{color:#fff;background:#f9a825;border-radius:.4em;padding:0 .45em;font-size:.9rem}

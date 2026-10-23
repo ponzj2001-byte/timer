@@ -1,5 +1,5 @@
-// 내용을 고칠 때마다 VERSION 숫자를 올립니다 (예: timer-v5 → timer-v6)
-const VERSION = 'timer-v5';
+// 내용을 고칠 때마다 VERSION 숫자를 올립니다 (예: timer-v6 → timer-v7)
+const VERSION = 'timer-v6';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
