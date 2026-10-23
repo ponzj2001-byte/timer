@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#1b2a49">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="수업 타이머">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>수업 타이머</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-screen="home" data-state="idle" data-live="off">
+
+<header id="bar">
+  <div class="brand"><span class="logo">⏱</span> 수업 타이머</div>
+  <button class="back" data-act="home" aria-label="처음 화면으로">‹ 처음 화면</button>
+  <div class="icons">
+    <button class="ibtn" id="bMute" data-act="mute" aria-label="소리 켜기/끄기"></button>
+    <button class="ibtn" id="bTheme" data-act="theme" aria-label="밝게/어둡게"></button>
+    <button class="ibtn" data-act="settings" aria-label="설정"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button>
+  </div>
+</header>
+
+<main id="main">
+  <!-- ① 오늘 날짜 (양력 + 음력) -->
+  <section class="card cDate" aria-label="오늘 날짜">
+    <div class="tag tagNavy">◆ 오늘 · 한국 표준시</div>
+    <div id="dateMain" class="dateMain"><span id="dY" class="dY">----년</span> <span id="dM" class="dM">--월</span> <span id="dD" class="dD">--일</span></div>
+    <div class="dateSub"><span id="dW" class="dW">---요일</span> <span id="dL" class="dL">(음력 --월 --일)</span></div>
+  </section>
+
+  <!-- ② 지금 시각 (시·분·초) -->
+  <section class="card cClock" aria-label="지금 시각">
+    <div class="tag tagBlue">◆ 지금 시각</div>
+    <div class="clockRow">
+      <div class="cu"><span id="cH" class="num h">--</span><span class="lab h">시</span></div>
+      <span class="colon">:</span>
+      <div class="cu"><span id="cM" class="num m">--</span><span class="lab m">분</span></div>
+      <span class="colon">:</span>
+      <div class="cu"><span id="cS" class="num s">--</span><span class="lab s">초</span></div>
+    </div>
+    <div id="ampm" class="ampm"></div>
+  </section>
+
+  <!-- ③ 타이머 설정 (시작 전) -->
+  <section class="card cSet" id="setCard" aria-label="타이머 설정">
+    <div class="tag tagPurple">◆ 타이머 설정</div>
+    <div class="chips" id="chips"></div>
+    <div class="inputs">
+      <input id="inMin" class="numIn" type="number" inputmode="numeric" min="0" max="999" aria-label="분"><span class="unit">분</span>
+      <input id="inSec" class="numIn" type="number" inputmode="numeric" min="0" max="59" aria-label="초"><span class="unit">초</span>
+    </div>
+    <div class="hint">아래 원을 돌려도 설정됩니다 · 시작하면 <b id="endPlan">--:--</b> 종료</div>
+  </section>
+
+  <!-- ④ 남은 시간 원형 다이얼 -->
+  <section class="ringBox" aria-label="남은 시간">
+    <div id="ringWrap">
+      <svg id="ring" viewBox="0 0 460 460" aria-label="남은 시간 원형 다이얼">
+        <g id="ticks"></g><g id="labels"></g>
+        <circle class="track" cx="230" cy="230" r="170"/>
+        <circle id="arc" cx="230" cy="230" r="170" transform="rotate(-90 230 230)"/>
+        <circle id="handle" cx="230" cy="60" r="16"/>
+      </svg>
+      <button id="center" data-act="toggle" aria-label="시작 또는 일시정지">
+        <span id="cLabel"></span>
+        <span id="cTime">05:00</span>
+        <span id="cSub"></span>
+        <span id="cHint"></span>
+      </button>
+    </div>
+  </section>
+
+  <div id="controls"></div>
+
+  <!-- ⑤ 다음 일정 (첫 화면, 일정이 있을 때만) -->
+  <section class="card cNext" id="nextCard" aria-label="다음 일정" hidden>
+    <div class="tag tagTeal">◆ 다음 일정</div>
+    <div id="nextList"></div>
+    <div id="ddayList"></div>
+  </section>
+
+  <!-- ⑥ 달력 · 일정 화면 -->
+  <section id="calScreen" aria-label="달력과 일정">
+    <div class="viewTabs">
+      <button class="vt on" data-act="view" data-v="month">📅 월 달력</button>
+      <button class="vt" data-act="view" data-v="list">📋 일정 목록</button>
+      <button class="vt" data-act="view" data-v="find">🔍 검색</button>
+    </div>
+
+    <div class="card cFind" id="findCard">
+      <div class="findRow"><input id="findIn" type="search" placeholder="일정 검색 (내용·장소·메모·종류·날짜)" aria-label="일정 검색"><button class="sbtn gray" data-act="findclear">지우기</button></div>
+      <div class="fsum" id="findSum">찾을 말을 넣으면 년·월·일·시와 함께 보여 줍니다.</div>
+      <div id="findList"></div>
+    </div>
+
+    <div class="card cCal" id="monthCard">
+      <div class="calHead">
+        <button class="navBtn" data-act="calprev" aria-label="이전 달">‹</button>
+        <div id="calTitle" class="calTitle">----년 --월</div>
+        <button class="navBtn" data-act="calnext" aria-label="다음 달">›</button>
+      </div>
+      <div class="calWeek"><span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span></div>
+      <div id="calGrid" class="calGrid"></div>
+      <div class="calFoot"><button class="todayBtn" data-act="caltoday">오늘로</button><span class="legend" id="legend"></span></div>
+    </div>
+
+    <div class="card cDay" id="dayCard">
+      <div class="tag tagOrange">◆ 선택한 날</div>
+      <div id="dayTitle" class="dayTitle"></div>
+      <div id="dayList"></div>
+      <button class="btn orange addBtn" data-act="newev">＋ 이날 일정 추가</button>
+    </div>
+
+    <div class="card cUp" id="listCard">
+      <div class="tag tagGreen" id="listTag">◆ 앞으로 30일 일정</div>
+      <div id="upList"></div>
+    </div>
+  </section>
+
+  <!-- 첫 화면 아래 버튼 -->
+  <div id="homeWrap">
+    <button class="btn big purple" data-act="opentimer" id="homeBtn">⏱ 타이머 설정</button>
+    <button class="btn big teal" data-act="opencal" id="calBtn">📅 달력 · 일정</button>
+  </div>
+</main>
+
+
+<!-- 일정 입력 창 -->
+<div id="formBg"><div class="sheet evSheet">
+  <div class="shead"><h2 id="formTitle">＋ 새 일정</h2><button class="sbtn gray" data-act="cancelev">닫기</button></div>
+  <div class="fgroup g1"><div class="flab">① 종류</div><div class="cats" id="evCats"></div></div>
+  <div class="fgroup g2"><div class="flab">② 제목</div><input id="evTitle" type="text" maxlength="60" placeholder="예: 학년 회의" aria-label="일정 제목"></div>
+  <div class="fgroup g3"><div class="flab">③ 날짜와 시각</div>
+    <div class="addRow"><input id="evDate" type="date" aria-label="날짜"><label class="chk"><input id="evAllday" type="checkbox"> 종일</label></div>
+    <div class="addRow" id="timeRow"><input id="evTime" type="time" aria-label="시작 시각"><span class="tilde">~</span><input id="evEnd" type="time" aria-label="끝 시각"></div>
+    <div class="lunarNote" id="evLunar"></div>
+  </div>
+  <div class="fgroup g4"><div class="flab">④ 알림 · 반복</div>
+    <div class="addRow">
+      <select id="evBefore" aria-label="미리 알림"><option value="-1">알림 없음</option><option value="0">정각에</option><option value="5">5분 전</option><option value="10">10분 전</option><option value="30">30분 전</option><option value="60">1시간 전</option><option value="1440">하루 전</option></select>
+      <select id="evRepeat" aria-label="반복"><option value="none">반복 없음</option><option value="daily">매일</option><option value="weekdays">평일 (월~금)</option><option value="weekly">매주</option><option value="monthly">매월</option><option value="yearly">매년 (양력)</option><option value="lunar">매년 (음력)</option></select>
+    </div>
+    <div class="addRow"><span class="small">반복 끝나는 날</span><input id="evUntil" type="date" aria-label="반복 끝나는 날"></div>
+  </div>
+  <div class="fgroup g5"><div class="flab">⑤ 장소 · 메모</div>
+    <input id="evPlace" type="text" maxlength="60" placeholder="장소 (예: 3층 회의실)" aria-label="장소">
+    <textarea id="evMemo" rows="6" maxlength="10000" placeholder="메모 (긴 글도 됩니다 · 줄바꿈 가능)" aria-label="메모"></textarea><div class="small memoCount" id="memoCount">0 / 10000자</div>
+    <label class="chk"><input id="evDday" type="checkbox"> 첫 화면에 D-day 표시</label>
+  </div>
+  <div class="addRow"><button class="btn orange addBtn" data-act="addev" id="addBtn">＋ 일정 저장</button><button class="btn red" data-act="delform" id="delBtn" hidden>삭제</button></div>
+</div></div>
+
+<!-- 일정 알림 화면 -->
+<div id="evAlert" role="alertdialog" aria-live="assertive">
+  <div class="evIcon">🔔</div>
+  <div class="evWhen" id="evWhen"></div>
+  <div class="evName" id="evName"></div>
+  <div class="evMore" id="evMore"></div>
+  <div class="evMemo" id="evMemoShow" hidden></div>
+  <button class="btn navy big" data-act="evok">확인</button>
+</div>
+
+<div id="done">
+  <div class="doneIcon">⏰</div>
+  <div id="dMsg">시간이 되었습니다</div>
+  <div id="dSub"></div>
+  <div class="doneBtns">
+    <button class="btn green big" data-act="again">같은 시간으로 다시 시작</button>
+    <button class="btn navy big" data-act="reset">새로 설정</button>
+  </div>
+</div>
+
+<div id="warn"></div>
+<div id="toast"></div>
+
+<!-- 설정 · 설치 · 보내기 시트 -->
+<div id="sheetBg"><div class="sheet" id="sheet"></div></div>
+
+<script src="app.js"></script>
+</body>
+</html>
